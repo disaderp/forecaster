@@ -1,6 +1,6 @@
-#List of used materials/modules
+# List of used materials/modules
 
-*information with '?' are not confirmed yet.
+*information with '?' are not confirmed yet.*
 
 - case made of 3mm plexiglass, for more info please reffer to [this](https://github.com/disaderp/forecaster/blob/master/SCHEM/x.jpg) file
 - any Android device (Android version >= 4.0 (?))
