@@ -9,8 +9,12 @@
 - Arduino UNO R3 MEGA328P
 - 24V mist maker
 - LEDs: (?)
-- 2 segment small LED numeric display
 - DC motor (?)
 - Power supply (?)
 - 'City models' to put inside the display
+- 2x 7segment numeric display (blue)
+- CD4051
+- MCP23017
+- NT73-2-AS12 5VDC
+- 2x BC547B
 - ...and some other basic discrete devices
