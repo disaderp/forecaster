@@ -8,7 +8,7 @@
 - DC 3-6V Micro Submersible Water Pump Low Noise 120 l/h 1.1m
 - Arduino UNO R3 MEGA328P
 - 24V mist maker
-- LEDs: (?)
+- LEDs: 5x white(cold), 1x white(warm)
 - DC motor (?)
 - Power supply (?)
 - 'City models' to put inside the display
@@ -17,4 +17,7 @@
 - MCP23017
 - NT73-2-AS12 5VDC
 - 2x BC547B
-- ...and some other basic discrete devices
+- 1N4002
+- resistors: 8x 470Ω, 2x 1kΩ
+- goldpin 1x23(at least)
+- ribbon cable: 2x 8-wire, 8x 2-wire, 1x 7-wire
