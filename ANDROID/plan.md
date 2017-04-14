@@ -1,6 +1,6 @@
 Android Forecaster Application Plan:
 - send on BT serial data
-- weather api(might be: https://openweathermap.org/appid)
+- weather api(might be: ~~https://openweathermap.org/appid~~, https://www.apixu.com/)
 - let user choose location
 - gps location
 - use android api to turn on BT, and (if possible) connect to the certain device

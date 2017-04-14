@@ -8,6 +8,31 @@
 #define D7 0x07
 #define D8 0x7F
 #define D9 0x67
+#define Dx 0x40
+
+int findNum(short num){
+	if (num == 0) return D0;
+	if (num == 1) return D1;
+	if (num == 2) return D2;
+	if (num == 3) return D3;
+	if (num == 4) return D4;
+	if (num == 5) return D5;
+	if (num == 6) return D6;
+	if (num == 7) return D7;
+	if (num == 8) return D8;
+	if (num == 9) return D9;
+	if (num == '-') return Dx;
+}
+
+typedef struct{
+	unsigned short light;
+	unsigned short clouds;
+	unsigned short rain;
+	bool lightning;
+	short temp1;
+	short temp2;
+	unsigned int valid;
+} Forecast;
 
 writeFirstDigit(int num){
 	Wire.beginTransmission(0x20);

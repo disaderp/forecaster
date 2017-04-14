@@ -18,6 +18,6 @@
 - NT73-2-AS12 5VDC
 - 2x BC547B
 - 3x 1N4002
-- resistors: 8x 470Ω, 2x 1kΩ
+- resistors: 8x 470Ω, 2x 1kΩ, 2x 4,7kΩ
 - goldpin 1x23(at least)
 - ribbon cable: 2x 8-wire, 8x 2-wire, 1x 7-wire
