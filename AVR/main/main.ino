@@ -1,5 +1,8 @@
 #include <SoftwareSerial.h>
 #include <Wire.h>
+#include <Time.h>
+#include <TimeLib.h>
+#include <DS1307RTC.h>
 #include "display.h"
 #include "LED.h"
 
@@ -30,6 +33,12 @@ void setup() {
 	Wire.write(0x01); // IODIRB register
 	Wire.write(0x00); // set all of port B to outputs
 	Wire.endTransmission();
+
+	if(!RTC.get() || RTC.get() > 100000){ //TODO: 24h * ms
+		RTC.set(1);//if no time - set to beginning
+	}else{
+		current = RTC.get() / fdata[0].valid * 10000; //TODO: h * ms
+	}
 }
 
 void loop() {
