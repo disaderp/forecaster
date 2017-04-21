@@ -23,6 +23,7 @@ void setup() {
 	pinMode(7, OUTPUT);//clouds
 	
 	BT.begin(9600);
+	Serial.begin(9600);//USB debugging
 	Wire.begin();
 	
 	Wire.beginTransmission(0x20);
@@ -34,10 +35,11 @@ void setup() {
 	Wire.write(0x00); // set all of port B to outputs
 	Wire.endTransmission();
 
-	if(!RTC.get() || RTC.get() > 100000){ //TODO: 24h * ms
-		RTC.set(1);//if no time - set to beginning
+	if(!RTC.get() || RTC.get() < 1000000000 || RTC.get() > 1000086400){ //24h -> s
+		RTC.set(1000000000);//if no time - set to beginning
 	}else{
-		current = RTC.get() / fdata[0].valid * 10000; //TODO: h * ms
+		current = (RTC.get()-1000000000) / fdata[0].valid * 3600; //h * s
+		if (current < 10) {data = true;}
 	}
 }
 
@@ -50,7 +52,7 @@ void loop() {
 			while(true){
 				d = BT.read();
 				if(d == 'N') entry = 0;
-				else if(d == 'R') break;
+				else if(d == 'R') {RTC.set(1000000000); break;}
 				else if(d != 'A') {BT.write("error"); break;}
 				
 				bool daytime = BT.parseInt(); BT.read();
@@ -78,9 +80,12 @@ void loop() {
 			current = 0;
 		}
 	}
+	
 	if(!data){
 		writeFirstDigit(Dx);
 		writeSecondDigit(Dx);
+		Serial.print("Time elapsed: ");
+		Serial.println(RTC.get()-1000000000);
 		delay(3000);
 	}else{
 		writeFirstDigit(fdata[current].temp1);
@@ -101,8 +106,8 @@ void loop() {
 	}
 }
 
-void waitForData(){
+/*void waitForData(){
 	while(BT.available()){
 		delay(50);//nothing
 	}
-}
+}*/
