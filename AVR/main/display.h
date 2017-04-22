@@ -37,12 +37,12 @@ typedef struct{
 writeFirstDigit(int num){
 	Wire.beginTransmission(0x20);
 	Wire.write(0x12);//first digit
-	Wire.write(num);//display digit
+	Wire.write(~num);//display digit //active low
 	Wire.endTransmission();
 }
 writeSecondDigit(int num){
 	Wire.beginTransmission(0x20);
 	Wire.write(0x13);//second digit
-	Wire.write(num);//display digit
+	Wire.write(~num);//display digit //active low
 	Wire.endTransmission();
 }

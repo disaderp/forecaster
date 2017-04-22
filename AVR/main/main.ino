@@ -50,11 +50,13 @@ void loop() {
 			BT.write("ok");
 			unsigned short entry = 0;
 			while(true){
+				waitForData();
 				d = BT.read();
-				if(d == 'N') entry = 0;
+				if(d == 'N') {entry = 0; continue;}
 				else if(d == 'R') {RTC.set(1000000000); break;}
-				else if(d != 'A') {BT.write("error"); break;}
-				
+				else if(d != 'A') {BT.write("error"); continue;}
+
+				waitForData();
 				bool daytime = BT.parseInt(); BT.read();
 				fdata[entry].clouds = BT.parseInt(); BT.read();
 				fdata[entry].rain = BT.parseInt(); BT.read();
@@ -106,8 +108,8 @@ void loop() {
 	}
 }
 
-/*void waitForData(){
-	while(BT.available()){
-		delay(50);//nothing
+void waitForData(){
+	while(!BT.available()){
+		delay(200);//nothing
 	}
-}*/
+}
