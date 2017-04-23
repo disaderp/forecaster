@@ -14,10 +14,10 @@ unsigned short current = 0;
 bool data = false;
 
 //timers
-int starttime;
-short rain;
-short clouds;
-short lightning;
+unsigned int starttime;
+unsigned short rain;
+unsigned short clouds;
+unsigned short lightning;
 //timers
 
 
@@ -205,7 +205,7 @@ void loop() {
 		//timeout check
 		if(RTC.get() - starttime > fdata[current].valid){
 			++current;
-			if (current = 10){
+			if (current == 10){
 				data = false;
 				#ifdef DEBUG
 					Serial.println("(DATA)Timeout: No new data");
