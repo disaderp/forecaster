@@ -1,6 +1,6 @@
 # Forecaster
 
-Physical weather forecast displayer
+Physical weather forecast displayer [![Build Status](https://travis-ci.org/disaderp/forecaster.svg?branch=master)](https://travis-ci.org/disaderp/forecaster)
 
 ## what are the features of 'display'
 
