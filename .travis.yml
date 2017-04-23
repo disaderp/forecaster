@@ -8,7 +8,7 @@ cache:
         - "~/.platformio"
 
 env:
-    - PLATFORMIO_CI_SRC=./AVR/main/main.ino
+    - PLATFORMIO_CI_SRC=./AVR/main
 
 install:
     - pip install -U platformio
