@@ -21,7 +21,7 @@ int findNum(short num){
 	if (num == 7) return D7;
 	if (num == 8) return D8;
 	if (num == 9) return D9;
-	if (num == '-') return Dx;
+	return Dx;
 }
 
 void writeFirstDigit(int num){

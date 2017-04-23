@@ -14,7 +14,7 @@ unsigned short current = 0;
 bool data = false;
 
 //timers
-unsigned int starttime;
+unsigned long starttime;//for arduino int is 2bytes :/
 unsigned short rain;
 unsigned short clouds;
 unsigned short lightning;
