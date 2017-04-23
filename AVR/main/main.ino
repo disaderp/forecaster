@@ -129,7 +129,7 @@ void loop() {
 				#ifdef DEBUG
 					Serial.print("(BT)DataInput: ");
 					char buffer[100];
-					sprintf(buffer, "L:%d C:%d R:%d L:%d T:%d%d V:%d\n", fdata[entry].light, fdata[entry].clouds, fdata[entry].rain, fdata[entry].lightning, fdata[entry].temp1, fdata[entry].temp2, fdata[entry].valid);
+					sprintf(buffer, "L:%hu C:%hu R:%hu L:%hhd T:%hu%hu V:%lu\n", fdata[entry].light, fdata[entry].clouds, fdata[entry].rain, fdata[entry].lightning, fdata[entry].temp1, fdata[entry].temp2, fdata[entry].valid);
 					Serial.print(buffer);
 				#endif
 				++entry;

@@ -9,8 +9,8 @@ typedef struct{
 	unsigned short light;
 	unsigned short clouds;
 	unsigned short rain;
-	short temp1;
-	short temp2;
+	unsigned short temp1;
+	unsigned short temp2;
 	bool lightning;
 } Forecast;
 
