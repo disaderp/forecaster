@@ -3,12 +3,13 @@
 #include <Time.h>
 #include <TimeLib.h>
 #include <DS1307RTC.h>
+#include <EEPROM.h>
 #include "display.h"
 #include "LED.h"
 #include "other.h"
 
 SoftwareSerial BT(12, 13); // RX, TX
-Forecast fdata[10];//@TODO: EEPROM
+Forecast fdata[10];
 unsigned short current = 0;
 bool data = false;
 
@@ -36,8 +37,8 @@ void setup() {
 		Serial.begin(9600);//USB debugging
 		#ifdef WAITFORDEBUGGER
 			while(!Serial){}
-			Serial.println("Debugger connected.");
 		#endif
+		Serial.println("(USB)Debugger connected.");
 	#endif
 
 	Wire.begin();
@@ -54,6 +55,16 @@ void setup() {
 		Serial.println("(7SEG)Module activated");
 	#endif
 
+	if(readConf()){
+		#ifdef DEBUG
+			Serial.println("(EEPROM)Previous data read successful");
+		#endif
+	}else{
+		#ifdef DEBUG
+			Serial.println("(EEPROM)Previous data read unsuccessful");
+		#endif
+	}
+
 	if(!RTC.get() || RTC.get() < 1000000000 || RTC.get() > 1000086400){ //24h -> s
 		#ifdef DEBUG
 			Serial.print("(RTC)No time: ");
@@ -61,16 +72,26 @@ void setup() {
 		#endif
 		RTC.set(1000000000);//if no time - set to beginning
 	}else{
-		current = (RTC.get()-1000000000) / fdata[0].valid * 3600; //h -> s
-		//prevtime = (RTC.get()
-		if (current < 10) {data = true;}
-		#ifdef DEBUG
-			Serial.print("(RTC)Current: ");
-			Serial.println(RTC.get()-1000000000);
-			Serial.print("(RTC)Data: ");
-			Serial.println(current);
-		#endif
+		for(int i = 0; i < 10; i++){
+			if(fdata[0].valid > RTC.get()){
+				current = i;
+				#ifdef DEBUG
+					Serial.print("(EEPROM)Found current: ");
+					Serial.println(current);
+				#endif
+				data = true;
+				break;
+			}
+		}
+		if (!data){
+			#ifdef DEBUG
+				Serial.println("(EEPROM)Cannot find current - timeout");
+			#endif
+		}
 	}
+	#ifdef DEBUG
+		Serial.println("(SETUP)Completed");
+	#endif
 }
 
 void loop() {
@@ -87,8 +108,8 @@ void loop() {
 				else if(d != 'A') {BT.write("error"); continue;}
 
 				waitForData(BT);
-				bool daytime = BT.parseInt(); BT.read();
-				fdata[entry].clouds = BT.parseInt(); BT.read();
+				bool daytime = BT.parseInt(); BT.read();//remove semicolon
+				fdata[entry].clouds = BT.parseInt(); BT.read();//...
 				fdata[entry].rain = BT.parseInt(); BT.read();
 				fdata[entry].lightning = BT.parseInt(); BT.read();
 				
@@ -98,7 +119,7 @@ void loop() {
 				else if(temp<10) {fdata[entry].temp1 = 0; fdata[entry].temp2 = findNum(temp);}
 				else {fdata[entry].temp1 = findNum(temp / 10); fdata[entry].temp2 = findNum(temp % 10);}
 				
-				fdata[entry].valid = BT.parseInt(); BT.read();
+				fdata[entry].valid = BT.parseInt() + (entry == 0 ? 1000000000 : fdata[entry-1].valid); BT.read();
 				if(daytime == true) {
 					fdata[entry].light = BT.parseInt(); BT.read();
 				}else{
@@ -107,12 +128,18 @@ void loop() {
 				
 				#ifdef DEBUG
 					Serial.print("(BT)DataInput: ");
-					printf("L:%d C:%d R:%d L:%d T:%d%d V:%d\n", fdata[entry].light, fdata[entry].clouds, fdata[entry].rain, fdata[entry].lightning, fdata[entry].temp1, fdata[entry].temp2, fdata[entry].valid);
+					char buffer[100];
+					sprintf(buffer, "L:%d C:%d R:%d L:%d T:%d%d V:%d\n", fdata[entry].light, fdata[entry].clouds, fdata[entry].rain, fdata[entry].lightning, fdata[entry].temp1, fdata[entry].temp2, fdata[entry].valid);
+					Serial.print(buffer);
 				#endif
 				++entry;
 				BT.write("ok");
 			}
 			data = true;
+			writeConf();
+			#ifdef DEBUG
+				Serial.println("(EEPROM)Wrote config");
+			#endif
 			starttime = 1000000000;
 			current = 0;
 		}
@@ -122,6 +149,7 @@ void loop() {
 		writeFirstDigit(Dx);
 		writeSecondDigit(Dx);
 		#ifdef DEBUG
+			Serial.println("(DATA)No data");
 			Serial.print("(RTC)Time elapsed: ");
 			Serial.println(RTC.get()-1000000000);
 		#endif
@@ -131,25 +159,81 @@ void loop() {
 		writeSecondDigit(fdata[current].temp2);
 
 		updateLED(fdata[current].light);
-		if (fdata[current].lightning) createLightning();
 
-		analogWrite(5, fdata[current].rain);
-
-		if(fdata[current].clouds > 0){
-			digitalWrite(7, 1);
-			delay(fdata[current].clouds * 20);
-			digitalWrite(7, 0);
+		//timers
+		if (fdata[current].lightning){
+			if(lightning > 100){//every 10 sec //@TODO: check timing
+				createLightning();
+				lightning = 0;
+				#ifdef DEBUG
+					Serial.println("(DISPLAY)Make lightning");
+				#endif
+			}else{
+				++lightning;
+			}
 		}
 		
+		if(rain > 50) {//every 5 seconds //@TODO: check timing
+			analogWrite(5, fdata[current].rain);
+			rain = 0;
+			#ifdef DEBUG
+				Serial.println("(DISPLAY)Make rain");
+			#endif
+		}else if(rain == 10){//make rain for 1 second //@TODO: check timing
+			analogWrite(5, 0);
+			++rain;
+		}else{
+			++rain;
+		}
+
+		if(fdata[current].clouds > 0){
+			if(clouds > 200){//every 20 seconds //@TODO: check timing
+				digitalWrite(7, 1);
+				clouds = 0;
+				#ifdef DEBUG
+					Serial.println("(DISPLAY)Make clouds");
+				#endif
+			}else if(clouds == 2*fdata[current].clouds){ //@TODO: check timing
+				digitalWrite(7, 0);
+				++clouds;
+			}else{
+				++clouds;
+			}			
+		}
+		//timers
 
 		//timeout check
 		if(RTC.get() - starttime > fdata[current].valid){
 			++current;
+			if (current = 10){
+				data = false;
+				#ifdef DEBUG
+					Serial.println("(DATA)Timeout: No new data");
+				#endif
+			}
 			#ifdef DEBUG
 				Serial.print("(DATA)Timeout - Next data: ");
 				Serial.println(current);
 			#endif
 		}
-		//delay(100);//@TODO timers
+		//timeout check
+
+		delay(100);
 	}
+}
+
+bool readConf(){
+	if(EEPROM.read(CONFIGSTART-1) == SAFETYNUMBER){
+		for (unsigned int t=0; t < sizeof(fdata); t++)
+			*((char*)&fdata + t) = EEPROM.read(CONFIGSTART + t);
+		return true;
+	}else{
+		return false;
+	}
+}
+
+void writeConf(){
+	EEPROM.write(CONFIGSTART-1, SAFETYNUMBER);
+	for (unsigned int t=0; t<sizeof(fdata); t++)
+		EEPROM.write(CONFIGSTART + t, *((char*)&fdata + t));
 }
