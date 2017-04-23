@@ -17,3 +17,6 @@ install:
 
 script:
     - platformio ci --board=uno
+
+notifications:
+    email: false
