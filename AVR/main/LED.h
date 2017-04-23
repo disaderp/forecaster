@@ -47,6 +47,6 @@ void updateLED(int light){
 
 void createLightning(){
 	digitalWrite(6, 1);
-	delay(50);
+	delay(50);//@TODO: check
 	digitalWrite(6, 0);
 }

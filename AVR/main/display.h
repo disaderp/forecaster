@@ -24,16 +24,6 @@ int findNum(short num){
 	if (num == '-') return Dx;
 }
 
-typedef struct{
-	unsigned short light;
-	unsigned short clouds;
-	unsigned short rain;
-	bool lightning;
-	short temp1;
-	short temp2;
-	unsigned int valid;
-} Forecast;
-
 writeFirstDigit(int num){
 	Wire.beginTransmission(0x20);
 	Wire.write(0x12);//first digit
