@@ -1,12 +1,19 @@
 language: python
 python:
     - "2.7"
+
+sudo: false
 cache:
     directories:
         - "~/.platformio"
 
+env:
+    - PLATFORMIO_CI_SRC=./AVR/main
+    - PLATFORMIO_CI_SRC=./AVR/main/main.ino
+
 install:
-    - python -c "$(curl -fsSL https://raw.githubusercontent.com/platformio/platformio/master/scripts/get-platformio.py)"
+    - pip install -U platformio
+    - platformio lib -g install 44
 
 script:
-    - platformio ci --project-conf AVR/main/platformio.ini main
+    - platformio ci --board=uno
