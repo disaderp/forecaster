@@ -24,13 +24,13 @@ int findNum(short num){
 	if (num == '-') return Dx;
 }
 
-writeFirstDigit(int num){
+void writeFirstDigit(int num){
 	Wire.beginTransmission(0x20);
 	Wire.write(0x12);//first digit
 	Wire.write(~num);//display digit //active low
 	Wire.endTransmission();
 }
-writeSecondDigit(int num){
+void writeSecondDigit(int num){
 	Wire.beginTransmission(0x20);
 	Wire.write(0x13);//second digit
 	Wire.write(~num);//display digit //active low

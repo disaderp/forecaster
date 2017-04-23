@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <Time.h>
 #include <TimeLib.h>
+#include <DS1307RTC.h>
 #include <EEPROM.h>
 #include "display.h"
 #include "LED.h"

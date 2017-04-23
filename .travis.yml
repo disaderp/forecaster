@@ -8,12 +8,12 @@ cache:
         - "~/.platformio"
 
 env:
-    - PLATFORMIO_CI_SRC=./AVR/main
     - PLATFORMIO_CI_SRC=./AVR/main/main.ino
 
 install:
     - pip install -U platformio
     - platformio lib -g install 44
+    - platformio lib -g install 421
 
 script:
     - platformio ci --board=uno
