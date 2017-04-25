@@ -98,23 +98,24 @@ void loop() {
 	if(BT.available()){
 		char d = BT.read();
 		if(d == 'E'){
-			BT.write("ok");
+			BT.print("OK");
+			#ifdef DEBUG
+				Serial.println("(BT)Input mode:");
+			#endif
 			unsigned short entry = 0;
 			while(true){
-				waitForData(BT);
 				d = BT.read();
 				if(d == 'N') {entry = 0; continue;}
 				else if(d == 'R') {RTC.set(1000000000); break;}
-				else if(d != 'A') {BT.write("error"); continue;}
-
-				waitForData(BT);
+				else if(d != 'A') {BT.write("ERROR"); continue;}
+				
 				bool daytime = BT.parseInt(); BT.read();//remove semicolon
 				fdata[entry].clouds = BT.parseInt(); BT.read();//...
 				fdata[entry].rain = BT.parseInt(); BT.read();
 				fdata[entry].lightning = BT.parseInt(); BT.read();
 				
 				short temp = BT.parseInt(); BT.read();
-				if(temp<=-10) {fdata[entry].temp1 = findNum(temp / -10); fdata[entry].temp2 = findNum(-(temp % -10));}//@TODO: check
+				if(temp<=-10) {fdata[entry].temp1 = findNum(temp / -10); fdata[entry].temp2 = findNum(-(temp % -10));}
 				else if(temp<0) {fdata[entry].temp1 = Dx; fdata[entry].temp2 = findNum(-temp);}
 				else if(temp<10) {fdata[entry].temp1 = 0; fdata[entry].temp2 = findNum(temp);}
 				else {fdata[entry].temp1 = findNum(temp / 10); fdata[entry].temp2 = findNum(temp % 10);}
@@ -133,7 +134,7 @@ void loop() {
 					Serial.print(buffer);
 				#endif
 				++entry;
-				BT.write("ok");
+				BT.write("OK");
 			}
 			data = true;
 			writeConf();
@@ -172,18 +173,20 @@ void loop() {
 				++lightning;
 			}
 		}
-		
-		if(rain > 50) {//every 5 seconds //@TODO: check timing
-			analogWrite(5, fdata[current].rain);
-			rain = 0;
-			#ifdef DEBUG
-				Serial.println("(DISPLAY)Make rain");
-			#endif
-		}else if(rain == 10){//make rain for 1 second //@TODO: check timing
-			analogWrite(5, 0);
-			++rain;
-		}else{
-			++rain;
+
+		if(fdata[current].rain > 0){
+			if(rain > 50) {//every 5 seconds //@TODO: check timing
+				analogWrite(5, fdata[current].rain);
+				rain = 0;
+				#ifdef DEBUG
+					Serial.println("(DISPLAY)Make rain");
+				#endif
+			}else if(rain == 10){//make rain for 1 second //@TODO: check timing
+				analogWrite(5, 0);
+				++rain;
+			}else{
+				++rain;
+			}
 		}
 
 		if(fdata[current].clouds > 0){
@@ -203,9 +206,13 @@ void loop() {
 		//timers
 
 		//timeout check
-		if(RTC.get() - starttime > fdata[current].valid){
+		if(RTC.get() > fdata[current].valid){
+			//reset outputs
+			analogWrite(5,0);
+			digitalWrite(7,0);
+			//
 			++current;
-			if (current == 10){
+			if (current == 9){
 				data = false;
 				#ifdef DEBUG
 					Serial.println("(DATA)Timeout: No new data");

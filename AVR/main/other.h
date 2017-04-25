@@ -1,7 +1,7 @@
 #define DEBUG
 #define WAITFORDEBUGGER
 #define CONFIGSTART 16
-#define SAFETYNUMBER 0x36
+#define SAFETYNUMBER 0x36 /*change this everytime the struct below changes*/
 
 
 typedef struct{
@@ -13,9 +13,3 @@ typedef struct{
 	unsigned short temp2;
 	bool lightning;
 } Forecast;
-
-void waitForData(SoftwareSerial S){
-	while(!S.available()){
-		delay(200);
-	}
-}
