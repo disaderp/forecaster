@@ -23,3 +23,7 @@
 ## limitations
 
 whole string has to be transmitted at once including ending `R` command, due to weird BT module issue(still investigating)
+
+## setting up the connection
+
+to connect with the device, find device `forecaster` and pair with it using `3637` as PIN number
