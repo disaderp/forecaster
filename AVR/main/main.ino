@@ -71,6 +71,7 @@ void setup() {
 			Serial.println(RTC.get());
 		#endif
 		RTC.set(1000000000);//if no time - set to beginning
+		EEPROM.write(CONFIGSTART-1, 0x00);//invalidate previous data
 	}else{
 		for(int i = 0; i < 10; i++){
 			if(fdata[0].valid > RTC.get()){
@@ -87,6 +88,7 @@ void setup() {
 			#ifdef DEBUG
 				Serial.println("(EEPROM)Cannot find current - timeout");
 			#endif
+			EEPROM.write(CONFIGSTART-1, 0x00);//invalidate previous data
 		}
 	}
 	#ifdef DEBUG
