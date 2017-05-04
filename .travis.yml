@@ -34,7 +34,7 @@ install:
     - platformio lib -g install 44
     - platformio lib -g install 421
 
-script: ./travis-scripts/build.sh
+script: bash ./travis-scripts/build.sh
 
 notifications:
     email: false
