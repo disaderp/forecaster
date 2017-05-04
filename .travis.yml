@@ -1,22 +1,33 @@
-language: python
-python:
-    - "2.7"
+language: android
+android:
+  components:
+    - android-25
 
 sudo: false
+
+matrix:
+  include:
+    - env: BUILD=android
+    - env: BUILD=avr PLATFORMIO_CI_SRC=./AVR/main
+
+before_cache:
+    - rm -f  ~/.gradle/caches/modules-2/modules-2.lock
+    - rm -fr ~/.gradle/caches/*/plugin-resolution/
 cache:
     directories:
-        - "~/.platformio"
+    - "~/.platformio"
+    # Android Gradle dependency caching
+    - ~/.gradle/caches/
+    - ~/.gradle/wrapper/
+    - ~/.android/build-cache
 
-env:
-    - PLATFORMIO_CI_SRC=./AVR/main
-
+# TODO needed only for AVR build
 install:
     - pip install -U platformio
     - platformio lib -g install 44
     - platformio lib -g install 421
 
-script:
-    - platformio ci --board=uno
+script: ./travis-scripts/build.sh
 
 notifications:
     email: false
