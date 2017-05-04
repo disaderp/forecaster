@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">ForecasterApp</string>
+    <string name="last_update">Last forecast update: </string>
+    <string name="update_btn">Update</string>
+    <string name="updating_btn">Updating...</string>
+    <string name="send_btn">Send to Display</string>
+    <string name="sending_btn">Sending...</string>
+    <string name="bt_not_supported">This Android device does not support Bluetooth. Unable to connect.</string>
+</resources>
