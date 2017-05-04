@@ -20,10 +20,17 @@ cache:
     - ~/.gradle/caches/
     - ~/.gradle/wrapper/
     - ~/.android/build-cache
+    
+#addons:
+#    apt:
+#        packages:
+#        - python-pip
 
 # TODO needed only for AVR build
+before_install:
+    - export PATH=$HOME/.local/bin:$PATH
 install:
-    - pip install -U platformio
+    - pip install -U platformio --user `whoami`
     - platformio lib -g install 44
     - platformio lib -g install 421
 
