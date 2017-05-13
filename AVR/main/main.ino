@@ -178,13 +178,13 @@ void loop() {
 
 		if(fdata[current].rain > 0){
 			if(rain > 50) {//every 5 seconds //@TODO: check timing
-				analogWrite(5, fdata[current].rain);
+				digitalWrite(5, 1);
 				rain = 0;
 				#ifdef DEBUG
 					Serial.println("(DISPLAY)Make rain");
 				#endif
-			}else if(rain == 10){//make rain for 1 second //@TODO: check timing
-				analogWrite(5, 0);
+			}else if(rain == fdata[current].rain){//@TODO: check timing
+				digitalWrite(5, 0);
 				++rain;
 			}else{
 				++rain;
