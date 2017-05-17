@@ -23,6 +23,7 @@ public class MainActivity extends Activity implements BtForecastDisplayConnector
     // keys for saving the component's state
     private static final String STATE_UPDATE_IN_PROGRESS = "updating_forecast";
     private static final String STATE_SEND_IN_PROGRESS = "sending_forecast";
+    private static final String STATE_SEND_DISABLED = "send_disabled";
 
     // Connector Fragment reference
     private static final String CONNECTOR_TAG = "BT_CONNECTOR_FRAGMENT";
@@ -37,6 +38,7 @@ public class MainActivity extends Activity implements BtForecastDisplayConnector
     // MAYBE change to enum
     private boolean mStateForecastUpdating = false;
     private boolean mStateForecastSending = false;
+    private boolean mStateSendDisabled = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -65,6 +67,7 @@ public class MainActivity extends Activity implements BtForecastDisplayConnector
     protected void onSaveInstanceState(Bundle outState) {
         outState.putBoolean(STATE_UPDATE_IN_PROGRESS, mStateForecastUpdating);
         outState.putBoolean(STATE_SEND_IN_PROGRESS, mStateForecastSending);
+        outState.putBoolean(STATE_SEND_DISABLED, mStateSendDisabled);
 
         super.onSaveInstanceState(outState);
     }
@@ -77,6 +80,7 @@ public class MainActivity extends Activity implements BtForecastDisplayConnector
 
         mStateForecastUpdating = savedInstanceState.getBoolean(STATE_UPDATE_IN_PROGRESS);
         mStateForecastSending = savedInstanceState.getBoolean(STATE_SEND_IN_PROGRESS);
+        mStateSendDisabled = savedInstanceState.getBoolean(STATE_SEND_DISABLED);
         // RUNTEST add default value?
 
         if (mStateForecastUpdating) {
@@ -84,6 +88,9 @@ public class MainActivity extends Activity implements BtForecastDisplayConnector
         }
         if (mStateForecastSending) {
             mViewSendBtn.setText(R.string.sending_btn);
+        }
+        if (mStateSendDisabled) {
+            mViewSendBtn.setEnabled(false);
         }
     }
 
@@ -97,6 +104,8 @@ public class MainActivity extends Activity implements BtForecastDisplayConnector
     }
 
     public void sendFetchedForecastToDisplay(View view) {
+        mViewSendBtn.setEnabled(false);
+        mStateSendDisabled = true;
         Log.d(TAG, "Send button pressed.");
 
         if (!mStateForecastSending && mConnectorFragment == null) {
@@ -104,22 +113,83 @@ public class MainActivity extends Activity implements BtForecastDisplayConnector
             FragmentManager fragmentManager = getFragmentManager();
             FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
             fragmentTransaction.add(new BtForecastDisplayConnector(), CONNECTOR_TAG);
+            // ctor call <- destroys if bt not supported!
             fragmentTransaction.commit();
+            // COMPAT used instead of fragmentTransaction.commitNow() (API level 24)
+            boolean arePending = fragmentManager.executePendingTransactions();
+            Log.d(TAG, "Are there any pending transactions?: " + arePending);
             // RUNTEST or commitNow?
+            mConnectorFragment = (BtForecastDisplayConnector) fragmentManager.findFragmentByTag(CONNECTOR_TAG);
+
+            // DEBUG
+            if (mConnectorFragment == null) Log.d(TAG, "FragmentTransaction has not been committed yet.");
+        }
+
+        // FIXME check if Fragment has been created! (if transaction was committed)
+
+        if (mConnectorFragment == null) {
+            // TODO deactivate DisplayBtConnection feature (degrade gracefully)
+            // TODO deactivate button
+            //mViewSendBtn.setEnabled(false);
+            //setClickable
+            //setActivated
+            //setSelected
+            Log.d(TAG, "Got BtNotSupported. Graceful degradation (TODO).");
+            return;
         }
 
         // TODO add checking if necessary
         mStateForecastSending = true;
         mViewSendBtn.setText(R.string.sending_btn);
         // TODO change the state after finishing sending
+
+        // TODO add checking
+        mConnectorFragment.connect();
     }
 
     // ConnectorCallback methods:
     @Override
     public void onBtNotSupported(BtForecastDisplayConnector connector) {
+        Log.d(TAG, "onBtNotSupported callback from ConnectorFragment.");
         getFragmentManager().beginTransaction().remove(connector).commit();
-        // TODO set reference to ConnectorFragment to null
+
+        if (mConnectorFragment == null) Log.d(TAG, "mConnectorFragment is still null.");
+        // DEBUG
+        /*if (connector != mConnectorFragment) {
+            throw new AssertionError("ConnectorFragment mismatch error.");
+        }*/
+
+        mConnectorFragment = null;
+        // leave state sendDisabled as true
     }
+
+    @Override
+    public void onConnected() {
+        Log.d(TAG, "onConnected callback from ConnectorFragment.");
+        //mConnectorFragment.send(data);
+    }
+
+    @Override
+    public void onConnectError() {
+        Log.d(TAG, "onConnectError callback from ConnectorFragment.");
+
+        mStateForecastSending = false;
+        mViewSendBtn.setText(R.string.send_btn);
+        mViewSendBtn.setEnabled(true);
+        mStateSendDisabled = false;
+    }
+
+    @Override
+    public void onForecastDataSent() {
+        Log.d(TAG, "onForecastDataSent callback from ConnectorFragment.");
+
+        mStateForecastSending = false;
+        mViewSendBtn.setText(R.string.send_btn);
+        mViewSendBtn.setEnabled(true);
+        mStateSendDisabled = false;
+    }
+
+
 
 
     // callback logging for debugging:

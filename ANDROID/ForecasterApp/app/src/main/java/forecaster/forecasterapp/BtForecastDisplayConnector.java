@@ -4,25 +4,40 @@ import android.app.Fragment;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothClass;
+import android.bluetooth.BluetoothSocket;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
 import android.app.Activity;
-import android.os.Bundle;
 
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Parcelable;
+import android.os.ParcelUuid;
+
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.UUID;
-import java.util.Set;
+import java.util.Arrays;
+
+import android.widget.Toast;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
+
+import java.io.IOException;
+import android.util.Log;
+
+import android.bluetooth.BluetoothClass;
 
 import android.support.annotation.Nullable;
-import android.util.Log;
 
 /**
  * This class represents Bluetooth connection with the ForecastDisplay device.
@@ -34,12 +49,13 @@ import android.util.Log;
 
 
 public class BtForecastDisplayConnector extends Fragment {
-    // tag for debug logging
+    // tag for logging
     private static final String TAG = "CONNECTOR_FRAGMENT";
 
-    public static final UUID DISPLAY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-    public static final String DISPLAY_MAC = "98D3:36:CDA0"; // probably wrong (too short)
+    public static final UUID DISPLAY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");    // Serial Port Profile (SPP)
+    public static final String DISPLAY_MAC = "98:D3:36:00:CD:A0";         // "94:E9:79:73:BC:04" //"98D3:36:CDA0"; //"98:D3:00:36:CD:A0"
     public static final String DISPLAY_NAME = "forecaster";
+    // TODO input from user when connecting for the first time and save on local storage
     public static final String DISPLAY_PIN = "3637";
 
     // int id for enable Bluetooth Activity
@@ -47,44 +63,29 @@ public class BtForecastDisplayConnector extends Fragment {
 
     private /*final*/ BluetoothAdapter mBtAdapter;
     private BluetoothDevice mDisplayDevice;
+    //private BluetoothSocket mBtSocket;
+    private ConnectionThread mConnThread;
 
     private ConnectorCallback mListener;
 
-    private final BroadcastReceiver mBtDiscoveryReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-
-            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                BluetoothClass deviceClass = intent.getParcelableExtra(BluetoothDevice.EXTRA_CLASS);
-
-                // TEMP
-                Log.d(TAG, "Discovered device class: Major: " + deviceClass.getMajorDeviceClass()
-                        + " minor: " + deviceClass.getDeviceClass());
-
-                if (checkIsDisplayDevice(device)) {
-                    mDisplayDevice = device;
-                    mBtAdapter.cancelDiscovery();
-                    // NOTSURE would it work correctly?
-                    //getActivity().unregisterReceiver(this);
-                }
-            } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
-                Log.d(TAG, "Device discovery started.");
-            }
-        }
-    }; //TODO also register to listen for the ACTION_STATE_CHANGED broadcast intent
+    //TODO register to listen for the ACTION_STATE_CHANGED broadcast intent (BroadcastReceiver)
+    //MAYBE TODO use ACTION_ACL_DISCONNECT_REQUESTED for graceful disconnection
 
 
     /** The container Activity must implement this interface.*/
     public interface ConnectorCallback {
         void onBtNotSupported(BtForecastDisplayConnector connector);
+        void onConnected();
+        void onConnectError(/*int/enum errorCode*/);
+        void onForecastDataSent(); // needed?
         // TODO add more
     }
 
+    // COMPAT added in API level 23 (Marshmallow), before: arg type: Activity
     @Override
-    public void onAttach(Context context) {
-        Log.d(TAG, "Fragment attached.");
+    @SuppressWarnings("deprecation")
+    public void onAttach(/*Context*/Activity context) {
+        Log.d(TAG, "Fragment attached, called onAttach(Activity).");
         super.onAttach(context);
 
         try {
@@ -93,6 +94,12 @@ public class BtForecastDisplayConnector extends Fragment {
             throw new ClassCastException(context.toString() + " must implement ConnectorCallback.");
         }
     }
+    @Override
+    public void onAttach(Context context) {
+        Log.d(TAG, "Fragment attached, called onAttach(Context).");
+        super.onAttach(context);
+        // calls onAttach(Activity)
+    }
 
     public boolean connect() {
         // if (!connected)
@@ -100,9 +107,11 @@ public class BtForecastDisplayConnector extends Fragment {
             // ask user to enable Bluetooth
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+        } else {
+            connectToDisplayDevice();
         }
 
-        mBtAdapter.cancelDiscovery(); // should be called before establishing connection to a remote device
+        //mBtAdapter.cancelDiscovery(); // should be called before establishing connection to a remote device
         // connect to the obtained mDisplayDevice (if found)
         // MAYBE set state to connected (outside of ConnectionThread)
         // get BluetoothSocket
@@ -110,10 +119,46 @@ public class BtForecastDisplayConnector extends Fragment {
         return true; // TEMP
     }
 
-    private boolean findDisplayDevice() {
-        // query paired devices, as this Android device can already be paired with the Display
-        Set<BluetoothDevice> pairedDevices = mBtAdapter.getBondedDevices();
+    private boolean connectToDisplayDevice() {
+        if (mDisplayDevice == null) Log.d(TAG, "BtDevice null as expected before finding the remote device.");
+        try {
+            mDisplayDevice = mBtAdapter.getRemoteDevice(DISPLAY_MAC);
+        } catch (IllegalArgumentException ex) {
+            Log.e(TAG, "findDisplayDevice: wrong MAC", ex);
+            mListener.onConnectError(/*reason*/);
+            return false;
+        }
 
+        if (mDisplayDevice == null) Log.e(TAG, "BtDevice not found");
+
+        IntentFilter sdpFilter = new IntentFilter(BluetoothDevice.ACTION_UUID);
+        getActivity().registerReceiver(mSdpReceiver, sdpFilter);
+        boolean initACLConnStarted = mDisplayDevice.fetchUuidsWithSdp();
+        Log.d(TAG, "ACL connection init started (for remote services discovery)?: " + initACLConnStarted);
+        return initACLConnStarted;
+
+
+
+        /*try {
+            BluetoothSocket btSocket = mDisplayDevice.createInsecureRfcommSocketToServiceRecord(DISPLAY_UUID);
+            // not necessarily here:
+            mConnThread = new ConnectionThread(btSocket);
+            mConnThread.start();
+        } catch (IOException ex) {
+            Log.e(TAG, "findDisplayDevice: error establishing connection", ex);
+            //e.g. BtDevice not available or insufficient permissions
+            mListener.onConnectError(/*reason*//*);
+            return false;
+        }
+
+        mListener.onConnected();
+        return true; // TEMP
+        */
+
+
+        // query paired devices, as this Android device can already be paired with the Display
+        /*Set<BluetoothDevice> pairedDevices = mBtAdapter.getBondedDevices();
+        Log.d(TAG, "Paired devices:");
         if (pairedDevices.size() > 0) {
             for (BluetoothDevice device : pairedDevices) {
                 if (checkIsDisplayDevice(device)) {
@@ -122,29 +167,46 @@ public class BtForecastDisplayConnector extends Fragment {
                 }
             }
         }
-
-        if (mDisplayDevice != null) return true; // TEMP
-
+        Log.d(TAG, "End of paired devices.");*/
         // Display not already paired, so perform the device discovery
-        Log.d(TAG, "Performing device discovery.");
 
+        /*
+        PERFORM DISCOVERY -- REMEMBER TO REGISTER (AND THEN UNREGISTER) THE RECEIVER
+        Log.d(TAG, "Performing device discovery.");
         IntentFilter broadcastFilter = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         getActivity().registerReceiver(mBtDiscoveryReceiver, broadcastFilter);
-
         broadcastFilter = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         getActivity().registerReceiver(mBtDiscoveryReceiver, broadcastFilter);
         // the BroadcastReceiver is unregistered in onStop() callback
-
         mBtAdapter.startDiscovery();
         // Found devices will be deliver to the registered BroadcastReceiver callback
+        return true;*/
+    }
 
-        return false; // TEMP
+    private boolean connectTemp() {
+        try {
+            mDisplayDevice.createBond();
+            byte[] pin = new byte[]{'3','6','3','7'};
+            mDisplayDevice.setPin(pin);
+            BluetoothSocket btSocket = mDisplayDevice.createInsecureRfcommSocketToServiceRecord(DISPLAY_UUID);
+            // not necessarily here:
+            mConnThread = new ConnectionThread(btSocket);
+            mConnThread.start();
+        } catch (/*IO*/Exception ex) {
+            Log.e(TAG, "findDisplayDevice: error establishing connection", ex);
+            //e.g. BtDevice not available or insufficient permissions
+            mListener.onConnectError(/*reason*/);
+            return false;
+        }
+
+        //mListener.onConnected(); -- called after connecting in ConnectionThread
+        return true; // TEMP
     }
 
     private boolean checkIsDisplayDevice(BluetoothDevice device) {
         String deviceName = device.getName();
         String deviceMAC = device.getAddress();
-        Log.d(TAG, "Paired device: " + deviceName + " , MAC: " + deviceMAC);
+        Log.d(TAG, "Device: " + deviceName + " , MAC: " + deviceMAC);
         // RUNTEST
         if (deviceName == DISPLAY_NAME) {
             // check if MAC addr is correct
@@ -155,9 +217,12 @@ public class BtForecastDisplayConnector extends Fragment {
 
     public void closeConnection() {
         Log.d(TAG, "Called to close the connection.");
-        // TODO close socket but do not remove Fragment
+        // close socket but do not remove Fragment
+        // RUNTEST NOTSURE enough?
+        mConnThread.close();
     }
 
+    // byte[] data
     private void sendData(String data) {
         Log.d(TAG, "Called to send data to Display. Data: " + data);
     }
@@ -201,9 +266,13 @@ public class BtForecastDisplayConnector extends Fragment {
         Log.d(TAG, "Fragment started.");
         super.onStart();
 
-        IntentFilter broadcastFilter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        //IntentFilter broadcastFilter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         // MAYBE: API level >23 --> getContext() ?
-        getActivity().registerReceiver(mBtDiscoveryReceiver, broadcastFilter);
+        //getActivity().registerReceiver(mBtDiscoveryReceiver, broadcastFilter);
+
+        IntentFilter pairingFilter = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
+        getActivity().registerReceiver(mSdpReceiver, pairingFilter);
+        getActivity().registerReceiver(mSdpReceiver, new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED));
     }
 
     @Override
@@ -211,9 +280,18 @@ public class BtForecastDisplayConnector extends Fragment {
         Log.d(TAG, "Fragment stopped.");
         super.onStop();
 
-        mBtAdapter.cancelDiscovery();
+        // FIXME can be null (if Bt not supported)!
+        //if (mBtAdapter != null)
+        //    mBtAdapter.cancelDiscovery();
         // NOTSURE unregister here, or just after connecting?
-        getActivity().unregisterReceiver(mBtDiscoveryReceiver);
+        //getActivity().unregisterReceiver(mBtDiscoveryReceiver);
+
+        try {   // TEMP
+            getActivity().unregisterReceiver(mSdpReceiver);
+            Log.d(TAG, "SDP Receiver unregistered");
+        } catch (IllegalArgumentException ex){ // RuntimeException
+            Log.d(TAG, "SDP Receiver not registered");
+        }
     }
 
     @Override
@@ -227,27 +305,125 @@ public class BtForecastDisplayConnector extends Fragment {
                 //2. if not found: conduct device discovery
                 //3. get the BluetoothDevice object representing the forecast display
                 //4. connect to the obtained BluetoothDevice
+                connectToDisplayDevice();
 
             } else {
                 Log.i(TAG, "Bt not enabled by user or error.");
                 Toast.makeText(getActivity(), "Bt not enabled.", Toast.LENGTH_SHORT).show();
-                // tell Activity to finish (remove) this Fragment
-                mListener.onBtNotSupported(this);
+                // return; // MAYBE do not destroy this Fragment (for now)
+                if (mListener == null) Log.d(TAG, "mListener is null.");
+                //mListener.onBtNotSupported(this); // TEMP
+                mListener.onConnectError();
             }
         }
-        //TODO also register to listen for the ACTION_STATE_CHANGED broadcast intent
     }
 
-    // TODO
-    private /*static*/ class ConnectionThread extends Thread {
+    private class ConnectionThread extends Thread {
+        // tag for logging
+        private static final String TAG = "CONNECTION_THREAD";
+
+        private BluetoothSocket mBtSocket;
+        private InputStream mInput;
+        private OutputStream mOutput;
+        private final Handler mMainHandler = new Handler(Looper.getMainLooper());
+
+        private boolean mCancel = false;
+
+        ConnectionThread (BluetoothSocket btSocket) {
+            super();
+            mBtSocket = btSocket;
+        }
+
         @Override
         public void run() {
-            //whole logic
+            // connect
+            mBtAdapter.cancelDiscovery();
+            try {
+                mBtSocket.connect();
+            } catch (IOException ex) {
+                Log.e(TAG, "run: connection failure", ex);
+                mMainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mListener.onConnectError();
+                    }
+                });
+                return;
+                // TODO Handler <- also tell the Fragment (onConnectError)
+            }
+            //Log.d(TAG, "Connection type: " + mBtSocket.getConnectionType()); //COMPAT API level 23
+            try {
+                mInput = mBtSocket.getInputStream();
+                mOutput = mBtSocket.getOutputStream();
+            } catch (IOException ex) {
+                Log.e(TAG, "run: could not obtain stream associated with bt socket", ex);
+                mMainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mListener.onConnectError();
+                    }
+                });
+                return;
+            }
+
+            mMainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mListener.onConnected();
+                }
+            });
+
+            byte[] buffer = new byte[10];
+
+            try {
+                String msg = "ENA1;80;75;1;-5;4;3;A0;0;0;1;64;50;R";
+                byte[] bmsg = msg.getBytes(Charset.defaultCharset());
+                mOutput.write(bmsg);
+
+                while (!mCancel) {
+                    // state machine?
+                    Log.d(TAG, "run: starting to read response");
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    }
+                    mInput.read(buffer);
+                    String received = new String(buffer, Charset.defaultCharset());
+                    Log.d(TAG, "run: read::" + received/*Arrays.toString(buffer)*/ + "::"); // NOTSURE will it work? RUNTEST
+                    // TODO Handler <- print message in Activity
+
+                    break;  // TEMP
+                }
+            } catch (IOException ex) {
+                Log.e(TAG, "run: I/O error occurred or stream closed", ex);
+                return;
+            }
+            Log.d(TAG, "run: got cancel request");
+            close();
+            Log.d(TAG, "Closed connection");
+            mMainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mListener.onConnectError();
+                }
+            }); // mocne TEMP
         }
 
         //NOTSURE or boolean?
         public void cancel() {
             //break loop in run()
+            mCancel = true;
+        }
+
+        public void close() {
+            try {
+                mBtSocket.close();
+                // NOTSURE close streams?
+            } catch (IOException ex) {
+                Log.e(TAG, "close: fail", ex);
+                ex.printStackTrace();
+            }
         }
     }
 
@@ -270,6 +446,115 @@ public class BtForecastDisplayConnector extends Fragment {
         }
     }*/
 
+    private final BroadcastReceiver mSdpReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (BluetoothDevice.ACTION_UUID.equals(action)) {
+                Log.d(TAG, "Entered SDP Receiver");
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                Log.d(TAG, "SDP Receiver: got device");
+                //ParcelUuid[] uuids = (ParcelUuid[]) intent.getParcelableArrayExtra(BluetoothDevice.EXTRA_UUID);
+                //ArrayList<ParcelUuid> uuids = null;
+                ParcelUuid[] uuids = null;
+                try {
+                    //uuids = intent.getParcelableArrayListExtra(BluetoothDevice.EXTRA_UUID);
+                    Parcelable[] extraUuids = intent.getParcelableArrayExtra(BluetoothDevice.EXTRA_UUID);
+                    if (extraUuids != null)
+                        uuids = Arrays.copyOf(extraUuids, extraUuids.length, ParcelUuid[].class);
+                } catch (ClassCastException ex) {
+                    Log.e(TAG, "We've got a problem, sir!", ex);
+                } catch (Exception ex) {
+                    Log.e(TAG, "Something bad happened..", ex);
+                }
+                Log.d(TAG, "SDP Receiver: got UUIDs");
+                Log.d(TAG, "SDP Receiver: Is received?: device: " + (device!=null) + " , uuids: " + (uuids!=null));
+                Log.d(TAG, "Fetched remote device MAC: " + device.getAddress());
+                if (uuids != null) {
+                    Log.d(TAG, "Fetched remote services UUIDs: " + uuids.length);
+                    for (ParcelUuid uuid : uuids)
+                        Log.d(TAG, "UUID: " + uuid.toString());
+                }
+
+                // TODO unregisterReceiver <- now in onPause callback
+                // be careful: http://stackoverflow.com/questions/2682043/how-to-check-if-receiver-is-registered-in-android
+                try {   // TEMP
+                    getActivity().unregisterReceiver(this);
+                    Log.d(TAG, "SDP Receiver unregistered");
+                } catch (IllegalArgumentException ex) { // RuntimeException
+                    Log.d(TAG, "SDP Receiver not registered");
+                }
+
+                if (uuids == null)
+                    mListener.onConnectError(/*reason : service UUID not found or remote device unreachable*/);
+                else
+                    // TODO NOTE: can be cached UUIDs !!
+                    connectTemp();
+            } else if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)) {
+                Log.d(TAG, "Entered Pairing Request Receiver");
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                // TODO? add device.equals(mDisplayDevice) ? <-- can device be null??
+                int pin = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_KEY, 0);
+                //the pin in case you need to accept for an specific pin
+                Log.d(TAG, "PIN: " + pin);
+
+                Log.d(TAG, "Bonded: " + device.getAddress());
+                byte[] pinBytes;
+                try {
+                    pinBytes = ("" + pin).getBytes("UTF-8");
+                    boolean pinSet = device.setPin(pinBytes);
+
+                    Log.d(TAG, "Is PIN set?: " + pinSet);
+                } catch(UnsupportedEncodingException ex) {
+                    ex.printStackTrace();
+                }
+
+                //setPairing confirmation if neeeded
+                //device.setPairingConfirmation(true);
+            } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, 0);
+                Log.d(TAG, "Bond state: " + state + " , device: " + device.getAddress());
+            }
+        }
+    };
+
+
+    /*
+    private final BroadcastReceiver mBtDiscoveryReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                BluetoothClass deviceClass = intent.getParcelableExtra(BluetoothDevice.EXTRA_CLASS);
+
+                // TEMP
+                Log.d(TAG, "Discovered device class: Major: " + deviceClass.getMajorDeviceClass()
+                        + " minor: " + deviceClass.getDeviceClass());
+
+                /*if (checkIsDisplayDevice(device)) {
+                    mDisplayDevice = device;
+                    mBtAdapter.cancelDiscovery();
+                    // NOTSURE would it work correctly?
+                    //getActivity().unregisterReceiver(this);
+                }*//*
+                String deviceName = device.getName();
+                String deviceMAC = device.getAddress();
+                Log.d(TAG, "Device: " + deviceName + " , MAC: " + deviceMAC);
+
+
+            } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
+                Log.d(TAG, "Device discovery started.");
+            } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                Log.d(TAG, "Device discovery finished.");
+            }
+        }
+    };
+    */
 
     // callback logging for debugging:
 
@@ -295,6 +580,13 @@ public class BtForecastDisplayConnector extends Fragment {
     public void onPause() {
         Log.d(TAG, "Fragment paused.");
         super.onPause();
+
+        /*try {   // TEMP
+            getActivity().unregisterReceiver(mSdpReceiver);
+            Log.d(TAG, "SDP Receiver unregistered");
+        } catch (IllegalArgumentException ex) { // RuntimeException
+            Log.d(TAG, "SDP Receiver not registered");
+        }*/
     }
 
     @Override
