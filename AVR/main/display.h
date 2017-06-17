@@ -9,6 +9,7 @@
 #define D8 0x7F
 #define D9 0x67
 #define Dx 0x40
+#define Do 0x5C
 
 int findNum(short num){
 	if (num == 0) return D0;

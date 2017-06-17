@@ -14,7 +14,6 @@ unsigned short current = 0;
 bool data = false;
 
 //timers
-unsigned long starttime;//for arduino int is 2bytes :/
 unsigned short rain;
 unsigned short clouds;
 unsigned short lightning;
@@ -36,7 +35,8 @@ void setup() {
 	#ifdef DEBUG
 		Serial.begin(9600);//USB debugging
 		#ifdef WAITFORDEBUGGER
-			while(!Serial){}
+			Serial.println("(USB)Debugger mode - press any key to start...");
+			while(!Serial.available()){}
 		#endif
 		Serial.println("(USB)Debugger connected.");
 	#endif
@@ -107,7 +107,7 @@ void loop() {
 			while(true){
 				d = BT.read();
 				if(d == 'N') {entry = 0; continue;}
-				else if(d == 'R') {RTC.set(1000000000); break;}
+				else if(d == 'R') {RTC.set(1000000000); Serial.println("(BT)Connection closed successfully"); break;}
 				else if(d != 'A') {BT.write("ERROR\0"); break;}
 				
 				bool daytime = BT.parseInt(); BT.read();//remove semicolon
@@ -142,20 +142,22 @@ void loop() {
 			#ifdef DEBUG
 				Serial.println("(EEPROM)Wrote config");
 			#endif
-			starttime = 1000000000;
 			current = 0;
 		}
 	}
 	
 	if(!data){
-		writeFirstDigit(Dx);
-		writeSecondDigit(Dx);
+		writeFirstDigit(Do);
+		writeSecondDigit(Do);
 		#ifdef DEBUG
 			Serial.println("(DATA)No data");
 			Serial.print("(RTC)Time elapsed: ");
 			Serial.println(RTC.get()-1000000000);
 		#endif
-		delay(4000);
+		delay(4000); 
+		writeFirstDigit(Do);
+		writeSecondDigit(Dx);
+		delay(200);
 	}else{
 		writeFirstDigit(fdata[current].temp1);
 		writeSecondDigit(fdata[current].temp2);

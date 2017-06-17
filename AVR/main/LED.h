@@ -47,6 +47,6 @@ void updateLED(int light){
 
 void createLightning(){
 	digitalWrite(6, 1);
-	delay(50);//@TODO: check
+	delay(50);//@TODO: 3 modes of lightning, rand
 	digitalWrite(6, 0);
 }
