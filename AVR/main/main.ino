@@ -11,6 +11,7 @@
 SoftwareSerial BT(12, 13); // RX, TX
 Forecast fdata[10];
 unsigned short current = 0;
+unsigned short ecount = 0;
 bool data = false;
 
 //timers
@@ -55,16 +56,6 @@ void setup() {
 		Serial.println("(7SEG)Module activated");
 	#endif
 
-	if(readConf()){
-		#ifdef DEBUG
-			Serial.println("(EEPROM)Previous data read successful");
-		#endif
-	}else{
-		#ifdef DEBUG
-			Serial.println("(EEPROM)Previous data read unsuccessful");
-		#endif
-	}
-
 	if(!RTC.get() || RTC.get() < 1000000000 || RTC.get() > 1000086400){ //24h -> s
 		#ifdef DEBUG
 			Serial.print("(RTC)No time: ");
@@ -73,6 +64,16 @@ void setup() {
 		RTC.set(1000000000);//if no time - set to beginning
 		EEPROM.write(CONFIGSTART-1, 0x00);//invalidate previous data
 	}else{
+		if(readConf()){
+			#ifdef DEBUG
+				Serial.println("(EEPROM)Previous data read successful");
+			#endif
+		}else{
+			#ifdef DEBUG
+				Serial.println("(EEPROM)Previous data read unsuccessful");
+			#endif
+		
+		}
 		for(int i = 0; i < 10; i++){
 			if(fdata[0].valid > RTC.get()){
 				current = i;
@@ -81,6 +82,7 @@ void setup() {
 					Serial.println(current);
 				#endif
 				data = true;
+				ecount = 10;//temp
 				break;
 			}
 		}
@@ -106,8 +108,14 @@ void loop() {
 			unsigned short entry = 0;
 			while(true){
 				d = BT.read();
-				if(d == 'N') {entry = 0; continue;}
-				else if(d == 'R') {RTC.set(1000000000); Serial.println("(BT)Connection closed successfully"); break;}
+				if(d == 'N') {entry = 0; ecount = 0; continue;}
+				else if(d == 'R') {
+					RTC.set(1000000000); 
+					ecount = entry; 
+					#ifdef 
+						DEBUG Serial.println("(BT)Connection closed successfully"); 
+					#endif 
+					break;}
 				else if(d != 'A') {BT.write("ERROR\0"); break;}
 				
 				bool daytime = BT.parseInt(); BT.read();//remove semicolon
@@ -213,10 +221,12 @@ void loop() {
 			//reset outputs
 			digitalWrite(5,0);
 			digitalWrite(7,0);
+			updateLED(0);
 			//
 			++current;
-			if (current == 10){
+			if (current == ecount){
 				data = false;
+				EEPROM.write(CONFIGSTART-1, 0x00);//invalidate previous data
 				#ifdef DEBUG
 					Serial.println("(DATA)Timeout: No new data");
 				#endif

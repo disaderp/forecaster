@@ -1,5 +1,5 @@
 #define DEBUG
-#define WAITFORDEBUGGER
+//#define WAITFORDEBUGGER
 #define CONFIGSTART 16
 #define SAFETYNUMBER 0x36 /*change this everytime the struct below changes*/
 
