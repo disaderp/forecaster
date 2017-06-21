@@ -112,8 +112,8 @@ void loop() {
 				else if(d == 'R') {
 					RTC.set(1000000000); 
 					ecount = entry; 
-					#ifdef 
-						DEBUG Serial.println("(BT)Connection closed successfully"); 
+					#ifdef DEBUG 
+						Serial.println("(BT)Connection closed successfully"); 
 					#endif 
 					break;}
 				else if(d != 'A') {BT.write("ERROR\0"); break;}
