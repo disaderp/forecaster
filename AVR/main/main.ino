@@ -54,7 +54,9 @@ void setup() {
 	Wire.endTransmission();
 	#ifdef DEBUG
 		Serial.println("(7SEG)Module activated");
+		Serial.println("(RNG)Setting seed");
 	#endif
+	srand(RTC.get());
 
 	if(!RTC.get() || RTC.get() < 1000000000 || RTC.get() > 1000086400){ //24h -> s
 		#ifdef DEBUG
