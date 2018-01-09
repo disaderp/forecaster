@@ -49,17 +49,17 @@ void createLightning(){
 	unsigned short rn = rand() % 3;
 	if(rn == 0){
 		digitalWrite(6, 1);
-		delay(50);
+		delay(45);
 		digitalWrite(6, 0);
 	}else if(rn == 1){
 		digitalWrite(6, 1);
-		delay(10);
+		delay(20);
 		digitalWrite(6, 0);
-		delay(5);
+		delay(20);
 		digitalWrite(6, 1);
-		delay(15);
+		delay(20);
 		digitalWrite(6, 0);
-		delay(5);
+		delay(20);
 		digitalWrite(6, 1);
 		delay(50);
 		digitalWrite(6, 0);
@@ -67,13 +67,13 @@ void createLightning(){
 		digitalWrite(6, 1);
 		delay(50);
 		digitalWrite(6, 0);
-		delay(5);
+		delay(50);
 		digitalWrite(6, 1);
-		delay(15);
+		delay(20);
 		digitalWrite(6, 0);
-		delay(5);
+		delay(20);
 		digitalWrite(6, 1);
-		delay(10);
+		delay(20);
 		digitalWrite(6, 0);
 	}
 	

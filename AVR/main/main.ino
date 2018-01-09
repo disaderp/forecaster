@@ -134,6 +134,7 @@ void loop() {
 				fdata[entry].valid = BT.parseInt() + (entry == 0 ? 1000000000 : fdata[entry-1].valid); BT.read();
 				if(daytime == true) {
 					fdata[entry].light = BT.parseInt(); BT.read();
+					if (fdata[entry].light > 1) fdata[entry].light = 1;//HARDWARE FAILURE WONTFIX
 				}else{
 					fdata[entry].light = fdata[entry].clouds < 80 ? SUNNY : CLOUDY;//@TODO: check
 				}
@@ -164,6 +165,7 @@ void loop() {
 			Serial.print("(RTC)Time elapsed: ");
 			Serial.println(RTC.get()-1000000000);
 		#endif
+		digitalWrite(7, 1);
 		delay(4000); 
 		writeFirstDigit(Do);
 		writeSecondDigit(Dx);
